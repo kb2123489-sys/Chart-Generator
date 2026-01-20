@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>分辨率控制测试</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+        }
+        
+        .controls {
+            margin-bottom: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        
+        .resolution-selector {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .resolution-selector label {
+            font-size: 0.9rem;
+            color: #555;
+            white-space: nowrap;
+        }
+
+        .resolution-select {
+            padding: 0.4rem 0.8rem;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background: white;
+            font-size: 0.9rem;
+            min-width: 160px;
+        }
+
+        .custom-resolution {
+            display: flex;
+            align-items: center;
+            gap: 0.3rem;
+        }
+
+        .custom-resolution input {
+            width: 80px;
+            padding: 0.4rem;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            text-align: center;
+            font-size: 0.9rem;
+        }
+
+        .custom-resolution span {
+            color: #666;
+            font-weight: bold;
+        }
+        
+        .btn {
+            padding: 8px 16px;
+            background: #3498db;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.9rem;
+        }
+        
+        .btn:hover {
+            background: #2980b9;
+        }
+        
+        .btn-secondary {
+            background: #6c757d;
+        }
+        
+        .btn-secondary:hover {
+            background: #5a6268;
+        }
+        
+        .container {
+            border: 2px solid #ccc;
+            border-radius: 8px;
+            background: #f8f9fa;
+            position: relative;
+            overflow: auto;
+            min-width: 300px;
+            min-height: 200px;
+            transition: all 0.3s ease;
+        }
+        
+        .info {
+            margin-top: 15px;
+            padding: 10px;
+            background: #e8f4f8;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+</head>
+<body>
+    <h1>分辨率控制测试</h1>
+    <p>测试图表容器的分辨率控制功能</p>
+    
+    <div class="controls">
+        <div class="resolution-selector">
+            <label for="resolutionSelect">分辨率:</label>
+            <select id="resolutionSelect" class="resolution-select">
+                <option value="auto">自适应</option>
+                <option value="1920x1080">1920×1080 (Full HD)</option>
+                <option value="1366x768">1366×768 (HD)</option>
+                <option value="1280x720">1280×720 (HD Ready)</option>
+                <option value="1024x768">1024×768 (XGA)</option>
+                <option value="800x600">800×600 (SVGA)</option>
+                <option value="1200x800">1200×800 (宽屏)</option>
+                <option value="1600x900">1600×900 (HD+)</option>
+                <option value="2560x1440">2560×1440 (2K)</option>
+                <option value="3840x2160">3840×2160 (4K)</option>
+                <option value="custom">自定义</option>
+            </select>
+        </div>
+        <div class="custom-resolution" id="customResolution" style="display: none;">
+            <input type="number" id="customWidth" placeholder="宽度" min="100" max="10000" value="1920">
+            <span>×</span>
+            <input type="number" id="customHeight" placeholder="高度" min="100" max="10000" value="1080">
+        </div>
+        <button id="applyResolutionBtn" class="btn">应用分辨率</button>
+        <button id="generateChartBtn" class="btn">生成图表</button>
+        <button id="exportPngBtn" class="btn btn-secondary">导出PNG</button>
+    </div>
+    
+    <div id="chartContainer" class="container" style="width: 100%; height: 500px;"></div>
+    
+    <div class="info">
+        <div>容器尺寸: <span id="containerSize">-</span></div>
+        <div>当前分辨率设置: <span id="currentResolution">自适应</span></div>
+    </div>
+
+    <script>
+        let chart = null;
+        
+        // 处理分辨率选择变化
+        function handleResolutionChange() {
+            const select = document.getElementById('resolutionSelect');
+            const customDiv = document.getElementById('customResolution');
+            
+            if (select.value === 'custom') {
+                customDiv.style.display = 'flex';
+            } else {
+                customDiv.style.display = 'none';
+            }
+            
+            updateCurrentResolution();
+        }
+        
+        // 获取当前分辨率设置
+        function getCurrentResolution() {
+            const select = document.getElementById('resolutionSelect');
+            const container = document.getElementById('chartContainer');
+            
+            if (select.value === 'auto') {
+                const rect = container.getBoundingClientRect();
+                return {
+                    width: Math.round(rect.width),
+                    height: Math.round(rect.height),
+                    mode: 'auto'
+                };
+            } else if (select.value === 'custom') {
+                return {
+                    width: parseInt(document.getElementById('customWidth').value),
+                    height: parseInt(document.getElementById('customHeight').value),
+                    mode: 'custom'
+                };
+            } else {
+                const [width, height] = select.value.split('x').map(Number);
+                return {
+                    width,
+                    height,
+                    mode: 'preset'
+                };
+            }
+        }
+        
+        // 应用分辨率设置
+        function applyResolution() {
+            const container = document.getElementById('chartContainer');
+            const resolution = getCurrentResolution();
+            
+            if (resolution.mode === 'auto') {
+                container.style.width = '100%';
+                container.style.height = '500px';
+                alert('已设置为自适应模式');
+            } else if (resolution.width && resolution.height) {
+                container.style.width = resolution.width + 'px';
+                container.style.height = resolution.height + 'px';
+                alert(`已设置分辨率为 ${resolution.width}×${resolution.height}`);
+            }
+            
+            setTimeout(() => {
+                if (chart) {
+                    chart.resize();
+                }
+                updateContainerSize();
+            }, 100);
+        }
+        
+        // 更新容器尺寸显示
+        function updateContainerSize() {
+            const container = document.getElementById('chartContainer');
+            const rect = container.getBoundingClientRect();
+            document.getElementById('containerSize').textContent = 
+                `${Math.round(rect.width)}×${Math.round(rect.height)}`;
+        }
+        
+        // 更新当前分辨率显示
+        function updateCurrentResolution() {
+            const select = document.getElementById('resolutionSelect');
+            const resolution = getCurrentResolution();
+            
+            if (resolution.mode === 'auto') {
+                document.getElementById('currentResolution').textContent = '自适应';
+            } else {
+                document.getElementById('currentResolution').textContent = 
+                    `${resolution.width}×${resolution.height}`;
+            }
+        }
+        
+        // 生成测试图表
+        function generateChart() {
+            const container = document.getElementById('chartContainer');
+            
+            if (chart) {
+                chart.dispose();
+            }
+            
+            chart = echarts.init(container);
+            
+            const option = {
+                title: {
+                    text: '分辨率测试图表',
+                    left: 'center'
+                },
+                tooltip: {
+                    trigger: 'axis'
+                },
+                legend: {
+                    data: ['数据1', '数据2'],
+                    top: 'bottom'
+                },
+                xAxis: {
+                    type: 'category',
+                    data: ['一月', '二月', '三月', '四月', '五月', '六月']
+                },
+                yAxis: {
+                    type: 'value'
+                },
+                series: [
+                    {
+                        name: '数据1',
+                        type: 'bar',
+                        data: [120, 200, 150, 80, 70, 110]
+                    },
+                    {
+                        name: '数据2',
+                        type: 'line',
+                        data: [20, 30, 25, 15, 12, 18]
+                    }
+                ]
+            };
+            
+            chart.setOption(option);
+            updateContainerSize();
+        }
+        
+        // 导出PNG
+        function exportPNG() {
+            if (!chart) {
+                alert('请先生成图表');
+                return;
+            }
+            
+            const resolution = getCurrentResolution();
+            const resolutionText = resolution.width && resolution.height ? 
+                `_${resolution.width}x${resolution.height}` : '';
+            
+            const url = chart.getDataURL({
+                type: 'png',
+                pixelRatio: 2,
+                backgroundColor: '#fff'
+            });
+            
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `test_chart${resolutionText}_${new Date().getTime()}.png`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+            alert('PNG导出成功');
+        }
+        
+        // 事件监听
+        document.getElementById('resolutionSelect').addEventListener('change', handleResolutionChange);
+        document.getElementById('applyResolutionBtn').addEventListener('click', applyResolution);
+        document.getElementById('generateChartBtn').addEventListener('click', generateChart);
+        document.getElementById('exportPngBtn').addEventListener('click', exportPNG);
+        
+        // 初始化
+        document.addEventListener('DOMContentLoaded', () => {
+            updateContainerSize();
+            updateCurrentResolution();
+            setInterval(updateContainerSize, 1000);
+        });
+        
+        // 窗口大小变化监听
+        window.addEventListener('resize', () => {
+            if (chart) {
+                chart.resize();
+            }
+            updateContainerSize();
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>智能图表生成器 - AI Chart Generator</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="css/components.css">
+    <!-- ECharts CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+    <!-- Pako for compression -->
+    <script src="https://cdn.jsdelivr.net/npm/pako@2.1.0/dist/pako.min.js"></script>
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="header-content">
+                <div class="header-left">
+                    <h1><i class="fas fa-chart-bar"></i> 图表生成器
+                    <span class="subtitle">基于AI的数据可视化工具 <a href="https://blog.shizhuoran.top/" target="_blank">By 北京-没想好</a> </span></h1>
+                    
+                </div>
+                <div class="header-right">
+                    <button id="configBtn" class="btn btn-icon config-btn" title="LLM API 配置">
+                        <i class="fas fa-cog"></i>
+                    </button>
+                    <button id="fullscreenBtn" class="btn btn-icon fullscreen-btn" title="全屏模式" style="display: none;">
+                        <i class="fas fa-expand"></i>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Left Panel: Data Input -->
+            <div class="left-panel">
+                <!-- Data Input Section -->
+                <section class="data-input-section">
+                    <div class="section-header">
+                        <h2><i class="fas fa-database"></i> 数据输入</h2>
+                        <button id="toggleDataInputBtn" class="btn btn-icon toggle-section-btn" title="收起数据输入区域">
+                            <i class="fas fa-chevron-left"></i>
+                        </button>
+                    </div>
+                    <div id="dataInputContent" class="data-input-content">
+                        <div class="input-group">
+                            <label for="dataInput">请输入您的数据：</label>
+                            <textarea
+                                id="dataInput"
+                                class="data-textarea"
+                                placeholder="标准或非标准的任意数据"
+                                rows="12"></textarea>
+                            <div class="input-actions">
+                                <button id="clearDataBtn" class="btn btn-secondary">
+                                    <i class="fas fa-trash"></i> 清除数据
+                                </button>
+                                <button id="analyzeDataBtn" class="btn btn-primary">
+                                    <i class="fas fa-chart-line"></i> 开始生成图表
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </div>
+
+            <!-- Middle Panel: AI Chat Interface -->
+            <div class="middle-panel">
+                <!-- AI Chat Section -->
+                <section class="ai-chat-section ai-chat-disabled">
+                    <div class="section-header">
+                        <h2><i class="fas fa-robot"></i> AI 图表助手</h2>
+                        <button id="clearChatBtn" class="btn btn-icon clear-chat-btn" title="清空对话记录">
+                            <i class="fas fa-broom"></i>
+                        </button>
+                    </div>
+
+                    <!-- Chat Messages Container -->
+                    <div id="chatMessages" class="chat-messages">
+                        <div class="welcome-message">
+                            <div class="message ai-message">
+                                <div class="message-avatar">
+                                    <i class="fas fa-robot"></i>
+                                </div>
+                                <div class="message-content">
+                                    <p>您好！我是您的AI图表助手。</p>
+                                    <p class="disabled-hint">请先在左侧输入数据并点击"开始生成图表"，然后我就可以帮您调整和优化图表了。</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Suggestions Panel -->
+                    <div id="suggestionPanel" class="suggestion-panel">
+                        <div class="suggestion-header">
+                            <h4><i class="fas fa-lightbulb"></i> 建议操作</h4>
+                            <button id="refreshSuggestionsBtn" class="btn btn-icon refresh-suggestions-btn" title="换一批建议">
+                                <i class="fas fa-sync-alt"></i>
+                            </button>
+                        </div>
+                        <div id="suggestions" class="suggestions-container">
+                            <!-- Dynamic suggestions will be inserted here -->
+                        </div>
+                    </div>
+
+                    <!-- Chat Input -->
+                    <div class="chat-input-container">
+                        <div class="chat-input-group">
+                            <textarea
+                                id="chatInput"
+                                class="chat-input"
+                                placeholder="请输入您的图表需求..."
+                                rows="3"></textarea>
+                            <button id="sendChatBtn" class="btn btn-primary chat-send-btn">
+                                <i class="fas fa-paper-plane"></i>
+                            </button>
+                        </div>
+                    </div>
+                </section>
+            </div>
+
+            <!-- Right Panel: Chart Preview & Export -->
+            <div class="right-panel">
+                <!-- Chart Preview -->
+                <section class="chart-preview-section">
+                    <div class="chart-header">
+                        <h2><i class="fas fa-chart-line"></i> 图表预览</h2>
+                        <div class="chart-controls">
+                            <button id="maximizeChartBtn" class="btn btn-icon" title="最大化图表">
+                                <i class="fas fa-expand-arrows-alt"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div id="chartContainer" class="chart-container">
+                        <div class="chart-placeholder">
+                            <i class="fas fa-chart-bar chart-placeholder-icon"></i>
+                            <p>请先输入数据并进行分析</p>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Export Actions -->
+                <section class="export-section">
+                    <h2><i class="fas fa-download"></i> 导出选项</h2>
+                    <div class="export-actions">
+                        <button id="exportPngBtn" class="btn btn-export" disabled>
+                            <i class="fas fa-image"></i> 导出 PNG
+                        </button>
+                        <button id="exportSvgBtn" class="btn btn-export" disabled>
+                            <i class="fas fa-vector-square"></i> 导出 SVG
+                        </button>
+                        <button id="exportCodeBtn" class="btn btn-export" disabled>
+                            <i class="fas fa-code"></i> 导出代码
+                        </button>
+                        <button id="shareChartBtn" class="btn btn-export" disabled>
+                            <i class="fas fa-share-alt"></i> 分享图表
+                        </button>
+                    </div>
+                </section>
+            </div>
+        </main>
+
+        <!-- Loading Overlay -->
+        <div id="loadingOverlay" class="loading-overlay" style="display: none;">
+            <div class="loading-content">
+                <div class="spinner"></div>
+                <p id="loadingText">正在处理中...</p>
+            </div>
+        </div>
+
+        <!-- API Configuration Modal -->
+        <div id="configModal" class="modal" style="display: none;">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3><i class="fas fa-cog"></i> LLM API 配置</h3>
+                    <button id="closeConfigModalBtn" class="btn btn-icon">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <div class="config-group">
+                        <div class="input-group">
+                            <label for="apiEndpoint">API 端点：</label>
+                            <input
+                                type="text"
+                                id="apiEndpoint"
+                                class="config-input"
+                                placeholder="https://api.openai.com/v1/chat/completions"
+                                value="https://api.openai.com/v1/chat/completions">
+                        </div>
+                        <div class="input-group">
+                            <label for="apiKey">API Key：</label>
+                            <div class="api-key-container">
+                                <input
+                                    type="password"
+                                    id="apiKey"
+                                    class="config-input"
+                                    placeholder="请输入您的API Key">
+                                <button id="toggleApiKeyBtn" class="btn btn-icon" title="显示/隐藏API Key">
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="input-group">
+                            <label for="modelName">模型名称：</label>
+                            <input
+                                type="text"
+                                id="modelName"
+                                class="config-input"
+                                placeholder="gpt-3.5-turbo"
+                                value="gpt-3.5-turbo">
+                        </div>
+                        <div class="config-actions">
+                            <button id="testConnectionBtn" class="btn btn-secondary">
+                                <i class="fas fa-plug"></i> 测试连接
+                            </button>
+                            <button id="saveConfigBtn" class="btn btn-primary">
+                                <i class="fas fa-save"></i> 保存配置
+                            </button>
+                            <button id="clearConfigBtn" class="btn btn-danger">
+                                <i class="fas fa-trash"></i> 清除配置
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Chart Maximized Modal -->
+        <div id="chartMaxModal" class="modal chart-max-modal" style="display: none;">
+            <div class="modal-content chart-max-content">
+                <div class="modal-header">
+                    <h3><i class="fas fa-chart-line"></i> 图表预览 - 最大化</h3>
+                    <div class="chart-max-controls">
+                        <div class="resolution-selector">
+                            <label for="resolutionSelect">分辨率:</label>
+                            <select id="resolutionSelect" class="resolution-select">
+                                <option value="auto">自适应</option>
+                                <option value="1920x1080">1920×1080 (Full HD)</option>
+                                <option value="1366x768">1366×768 (HD)</option>
+                                <option value="1280x720">1280×720 (HD Ready)</option>
+                                <option value="1024x768">1024×768 (XGA)</option>
+                                <option value="800x600">800×600 (SVGA)</option>
+                                <option value="1200x800">1200×800 (宽屏)</option>
+                                <option value="1600x900">1600×900 (HD+)</option>
+                                <option value="2560x1440">2560×1440 (2K)</option>
+                                <option value="3840x2160">3840×2160 (4K)</option>
+                                <option value="custom">自定义</option>
+                            </select>
+                        </div>
+                        <div class="custom-resolution" id="customResolution" style="display: none;">
+                            <input type="number" id="customWidth" placeholder="宽度" min="100" max="10000" value="1920">
+                            <span>×</span>
+                            <input type="number" id="customHeight" placeholder="高度" min="100" max="10000" value="1080">
+                        </div>
+                        <button id="applyResolutionBtn" class="btn btn-primary">
+                            <i class="fas fa-expand-arrows-alt"></i> 应用
+                        </button>
+                        <button id="exportMaxPngBtn" class="btn btn-secondary">
+                            <i class="fas fa-image"></i> 导出PNG
+                        </button>
+                        <button id="exportMaxSvgBtn" class="btn btn-secondary">
+                            <i class="fas fa-vector-square"></i> 导出SVG
+                        </button>
+                        <button id="closeChartMaxBtn" class="btn btn-icon">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="modal-body">
+                    <div id="chartMaxContainer" class="chart-max-container">
+                        <!-- Maximized chart will be rendered here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal for displaying code -->
+        <div id="codeModal" class="modal" style="display: none;">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>ECharts 配置代码</h3>
+                    <button id="copyCodeBtn" class="btn btn-primary">
+                        <i class="fas fa-copy"></i> 复制代码
+                    </button>
+                    <button id="closeModalBtn" class="btn btn-icon">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <pre id="codeContent"></pre>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- JavaScript Files -->
+    <script src="js/utils.js"></script>
+    <script src="js/dataProcessor.js"></script>
+    <script src="js/apiClient.js"></script>
+    <script src="js/chartGenerator.js"></script>
+    <script src="js/formBuilder.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>

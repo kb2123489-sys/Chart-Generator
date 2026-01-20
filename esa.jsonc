@@ -1,0 +1,11 @@
+{
+    "assets": {
+        "directory": "."
+    },
+    "routes": [
+        {
+            "src": ".*",
+            "dest": "/index.html"
+        }
+    ]
+}

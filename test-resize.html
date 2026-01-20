@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>图表响应式测试</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+        }
+        
+        .container {
+            width: 100%;
+            height: 80vh;
+            border: 2px solid #ccc;
+            border-radius: 8px;
+            background: #f8f9fa;
+            position: relative;
+            resize: both;
+            overflow: auto;
+            min-width: 300px;
+            min-height: 200px;
+        }
+        
+        .controls {
+            margin-bottom: 20px;
+        }
+        
+        .controls button {
+            margin-right: 10px;
+            padding: 8px 16px;
+            background: #3498db;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        
+        .controls button:hover {
+            background: #2980b9;
+        }
+        
+        .info {
+            margin-top: 10px;
+            padding: 10px;
+            background: #e8f4f8;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+</head>
+<body>
+    <h1>ECharts 响应式测试</h1>
+    <p>拖拽容器右下角调整大小，或点击按钮改变窗口大小，观察图表是否正确调整。</p>
+    
+    <div class="controls">
+        <button onclick="generateChart()">生成图表</button>
+        <button onclick="resizeContainer(800, 400)">设置容器 800x400</button>
+        <button onclick="resizeContainer(600, 300)">设置容器 600x300</button>
+        <button onclick="resizeContainer('100%', '60vh')">设置容器 100%x60vh</button>
+        <button onclick="manualResize()">手动调整图表大小</button>
+    </div>
+    
+    <div id="chartContainer" class="container"></div>
+    
+    <div class="info">
+        <div>容器尺寸: <span id="containerSize">-</span></div>
+        <div>图表状态: <span id="chartStatus">未创建</span></div>
+    </div>
+
+    <script>
+        let chart = null;
+        let resizeObserver = null;
+        
+        // 防抖函数
+        function debounce(func, wait) {
+            let timeout;
+            return function executedFunction(...args) {
+                const later = () => {
+                    clearTimeout(timeout);
+                    func(...args);
+                };
+                clearTimeout(timeout);
+                timeout = setTimeout(later, wait);
+            };
+        }
+        
+        // 更新容器尺寸显示
+        function updateContainerSize() {
+            const container = document.getElementById('chartContainer');
+            const rect = container.getBoundingClientRect();
+            document.getElementById('containerSize').textContent = 
+                `${Math.round(rect.width)}x${Math.round(rect.height)}`;
+        }
+        
+        // 生成测试图表
+        function generateChart() {
+            const container = document.getElementById('chartContainer');
+            
+            // 清理现有图表
+            if (chart) {
+                chart.dispose();
+            }
+            
+            // 创建新图表
+            chart = echarts.init(container);
+            
+            const option = {
+                title: {
+                    text: '响应式测试图表',
+                    left: 'center'
+                },
+                tooltip: {
+                    trigger: 'axis'
+                },
+                legend: {
+                    data: ['销量', '利润'],
+                    top: 'bottom'
+                },
+                xAxis: {
+                    type: 'category',
+                    data: ['一月', '二月', '三月', '四月', '五月', '六月']
+                },
+                yAxis: {
+                    type: 'value'
+                },
+                series: [
+                    {
+                        name: '销量',
+                        type: 'bar',
+                        data: [120, 200, 150, 80, 70, 110]
+                    },
+                    {
+                        name: '利润',
+                        type: 'line',
+                        data: [20, 30, 25, 15, 12, 18]
+                    }
+                ]
+            };
+            
+            chart.setOption(option);
+            document.getElementById('chartStatus').textContent = '已创建';
+            
+            // 设置窗口大小变化监听
+            const resizeHandler = debounce(() => {
+                if (chart && !chart.isDisposed()) {
+                    console.log('窗口大小变化，调整图表');
+                    chart.resize();
+                    updateContainerSize();
+                }
+            }, 150);
+            
+            window.removeEventListener('resize', window.chartResizeHandler);
+            window.addEventListener('resize', resizeHandler);
+            window.chartResizeHandler = resizeHandler;
+            
+            // 设置容器大小变化监听
+            if (window.ResizeObserver) {
+                if (resizeObserver) {
+                    resizeObserver.disconnect();
+                }
+                resizeObserver = new ResizeObserver(debounce((entries) => {
+                    if (chart && !chart.isDisposed()) {
+                        console.log('容器大小变化，调整图表');
+                        for (let entry of entries) {
+                            const { width, height } = entry.contentRect;
+                            console.log('新的容器尺寸:', { width, height });
+                        }
+                        chart.resize();
+                        updateContainerSize();
+                    }
+                }, 100));
+                resizeObserver.observe(container);
+            }
+            
+            updateContainerSize();
+        }
+        
+        // 调整容器大小
+        function resizeContainer(width, height) {
+            const container = document.getElementById('chartContainer');
+            container.style.width = typeof width === 'string' ? width : width + 'px';
+            container.style.height = typeof height === 'string' ? height : height + 'px';
+            
+            setTimeout(() => {
+                updateContainerSize();
+                if (chart && !chart.isDisposed()) {
+                    chart.resize();
+                }
+            }, 100);
+        }
+        
+        // 手动调整图表大小
+        function manualResize() {
+            if (chart && !chart.isDisposed()) {
+                chart.resize();
+                updateContainerSize();
+                console.log('手动调整图表大小');
+            }
+        }
+        
+        // 页面加载完成后初始化
+        document.addEventListener('DOMContentLoaded', () => {
+            updateContainerSize();
+            
+            // 监听容器尺寸变化
+            setInterval(updateContainerSize, 1000);
+        });
+        
+        // 页面卸载时清理资源
+        window.addEventListener('beforeunload', () => {
+            if (chart) {
+                chart.dispose();
+            }
+            if (resizeObserver) {
+                resizeObserver.disconnect();
+            }
+            if (window.chartResizeHandler) {
+                window.removeEventListener('resize', window.chartResizeHandler);
+            }
+        });
+    </script>
+</body>
+</html>
